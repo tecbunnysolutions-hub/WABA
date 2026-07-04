@@ -61,27 +61,35 @@ export async function POST(req: Request) {
         .eq('sender_number', senderNumber)
         .single();
 
+      let convId;
       if (existingConv) {
+        convId = existingConv.id;
         await supabase
           .from('Conversation')
           .update({ last_interaction_timestamp: new Date().toISOString() })
           .eq('sender_number', senderNumber);
       } else {
-        await supabase
+        const { data: newConv } = await supabase
           .from('Conversation')
-          .insert({ sender_number: senderNumber, last_interaction_timestamp: new Date().toISOString() });
+          .insert({ sender_number: senderNumber, last_interaction_timestamp: new Date().toISOString() })
+          .select('id')
+          .single();
+        if (newConv) convId = newConv.id;
       }
 
-      // Insert incoming message
-      await supabase
-        .from('Message')
-        .insert({
-          message_id: messageId,
-          sender_number: senderNumber,
-          direction: 'INBOUND',
-          message_content: textContent,
-          timestamp: new Date().toISOString()
-        });
+      if (convId) {
+        // Insert incoming message
+        await supabase
+          .from('Message')
+          .insert({
+            message_id: messageId,
+            conversation_id: convId,
+            sender_number: senderNumber,
+            direction: 'INBOUND',
+            message_content: textContent,
+            timestamp: new Date().toISOString()
+          });
+      }
 
       // --- AUTOMATED CHATBOT LOGIC ---
       if (textContent) {
