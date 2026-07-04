@@ -52,10 +52,20 @@ export async function POST(req: Request) {
       const messageId = msg.messageId;
       
       let textContent = '';
+      let mediaUrl = null;
+      let mediaType = null;
+      
       if (msg.message?.text) {
         textContent = msg.message.text;
-      } else if (Array.isArray(msg.content) && msg.content[0]?.text) {
-        textContent = msg.content[0].text;
+      } else if (Array.isArray(msg.content) && msg.content.length > 0) {
+        const content = msg.content[0];
+        if (content.type === 'TEXT') {
+          textContent = content.text || '';
+        } else if (content.type === 'IMAGE' || content.type === 'VIDEO' || content.type === 'DOCUMENT' || content.type === 'AUDIO') {
+          mediaUrl = content.url || content.mediaUrl || '';
+          mediaType = content.type;
+          textContent = content.caption || '';
+        }
       } else if (msg.content?.text) {
         textContent = msg.content.text;
       }
@@ -89,7 +99,9 @@ export async function POST(req: Request) {
           message_id: messageId,
           sender_number: senderNumber,
           direction: 'INBOUND',
-          message_content: textContent,
+          message_content: textContent || (mediaUrl ? '[Media]' : ''),
+          media_url: mediaUrl,
+          media_type: mediaType,
           timestamp: new Date().toISOString()
         });
 

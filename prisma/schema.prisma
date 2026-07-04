@@ -23,6 +23,8 @@ model Message {
   message_content String
   timestamp       DateTime     @default(now())
   status          String       @default("DELIVERED")
+  media_url       String?
+  media_type      String?
 
   conversation    Conversation @relation(fields: [sender_number], references: [sender_number])
 }

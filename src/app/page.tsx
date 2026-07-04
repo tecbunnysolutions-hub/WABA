@@ -142,7 +142,13 @@ export default function Dashboard() {
               {messages.map(msg => (
                 <div key={msg.id} className={`message-wrapper ${msg.direction.toLowerCase()}`}>
                   <div className="message-bubble">
-                    <p>{msg.message_content}</p>
+                    {msg.media_url && msg.media_type === 'IMAGE' && (
+                      <img src={msg.media_url} alt="Attached image" style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px' }} />
+                    )}
+                    {msg.media_url && msg.media_type === 'VIDEO' && (
+                      <video src={msg.media_url} controls style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px' }} />
+                    )}
+                    {msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>}
                     <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
