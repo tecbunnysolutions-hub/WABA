@@ -9,6 +9,8 @@ type Message = {
   message_content: string;
   timestamp: string;
   status: string;
+  media_url?: string;
+  media_type?: string;
 };
 
 type Conversation = {
