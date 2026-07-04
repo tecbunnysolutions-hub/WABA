@@ -21,12 +21,25 @@ function verifySignature(payload: string, signature: string | null): boolean {
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    // Assuming Infobip sends the signature in x-hub-signature-256 or x-hub-signature header. 
-    // This may need adjustment based on Infobip's exact webhook signature header name.
+    
+    // Check if the user is passing a token in the URL query parameters
+    const url = new URL(req.url);
+    const token = url.searchParams.get('token');
+    
+    // Check headers for HMAC signature
     const signature = req.headers.get('x-hub-signature-256') || req.headers.get('x-hub-signature');
 
-    if (!verifySignature(rawBody, signature)) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    // Authenticate via URL token OR HMAC signature
+    let isAuthenticated = false;
+    
+    if (token === INFOBIP_HMAC_SECRET) {
+      isAuthenticated = true;
+    } else if (signature && verifySignature(rawBody, signature)) {
+      isAuthenticated = true;
+    }
+
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Invalid authentication token or signature' }, { status: 401 });
     }
 
     const body = JSON.parse(rawBody);
