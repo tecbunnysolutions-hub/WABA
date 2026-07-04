@@ -150,6 +150,14 @@ export default function Dashboard() {
                     {msg.media_url && msg.media_type === 'VIDEO' && (
                       <video src={msg.media_url} controls style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px' }} />
                     )}
+                    {msg.media_url && msg.media_type === 'AUDIO' && (
+                      <audio src={msg.media_url} controls style={{ maxWidth: '100%', marginBottom: '8px' }} />
+                    )}
+                    {msg.media_url && msg.media_type === 'DOCUMENT' && (
+                      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', marginBottom: '8px', color: '#fff', textDecoration: 'none', fontWeight: 500 }}>
+                        <span>📄</span> View Document
+                      </a>
+                    )}
                     {msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>}
                     <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>

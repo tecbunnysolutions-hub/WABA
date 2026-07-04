@@ -97,6 +97,12 @@ export async function POST(req: Request) {
               console.error('Failed to proxy media to Supabase:', err);
             }
           }
+        } else if (content.type === 'LOCATION') {
+          textContent = `📍 Location: https://maps.google.com/?q=${content.latitude},${content.longitude} ${content.address ? `(${content.address})` : ''}`;
+        } else if (content.type === 'CONTACT') {
+          const contactName = content.contacts?.[0]?.name?.formattedName || 'Contact';
+          const contactPhone = content.contacts?.[0]?.phones?.[0]?.phone || 'Unknown number';
+          textContent = `👤 Contact: ${contactName} (${contactPhone})`;
         }
       } else if (msg.content?.text) {
         textContent = msg.content.text;
