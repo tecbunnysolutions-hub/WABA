@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
-const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL || 'w4pz8r.api.infobip.com';
-const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '5fc59d2ed3c46876ecd2914f4c4686af-b1ebcd6b-ce8e-47f5-b56f-340c9d041c4c';
-const SYSTEM_NUMBER = process.env.SYSTEM_NUMBER || '15558835946';
+const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL || '';
+const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '';
+const SYSTEM_NUMBER = process.env.SYSTEM_NUMBER || '';
 const TEMPLATE_NAME = process.env.TEMPLATE_NAME || 'hello_world';
 const TEMPLATE_LANGUAGE = process.env.INFOBIP_WHATSAPP_TEMPLATE_LANGUAGE || 'en';
 
