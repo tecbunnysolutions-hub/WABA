@@ -12,6 +12,11 @@ model Conversation {
   id                         Int       @id @default(autoincrement())
   sender_number              String    @unique
   last_interaction_timestamp DateTime  @default(now())
+  contact_name               String?
+  status                     String    @default("NEW")
+  tags                       String[]  @default([])
+  notes                      String?
+  ad_source                  String?
   messages                   Message[]
 }
 

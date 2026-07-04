@@ -120,23 +120,41 @@ export async function POST(req: Request) {
 
       if (!senderNumber || !messageId) continue;
 
-      // Upsert conversation to update last_interaction_timestamp
-      // Upsert conversation to update last_interaction_timestamp
+      // Extract Ad Attribution if present
+      let adSource = null;
+      if (msg.context?.referral?.headline) {
+        adSource = `Ad: ${msg.context.referral.headline}`;
+      } else if (msg.referral?.headline) {
+        adSource = `Ad: ${msg.referral.headline}`;
+      } else if (msg.context?.referral?.sourceUrl || msg.referral?.sourceUrl) {
+        adSource = `Ad Link`;
+      }
+
+      // Upsert conversation to update last_interaction_timestamp and optionally ad_source
       const { data: existingConv } = await supabase
         .from('Conversation')
-        .select('id')
+        .select('id, ad_source')
         .eq('sender_number', senderNumber)
         .single();
 
       if (existingConv) {
+        const updatePayload: any = { last_interaction_timestamp: new Date().toISOString() };
+        // Only update ad_source if we found a new one and it was previously empty
+        if (adSource && !existingConv.ad_source) {
+          updatePayload.ad_source = adSource;
+        }
         await supabase
           .from('Conversation')
-          .update({ last_interaction_timestamp: new Date().toISOString() })
+          .update(updatePayload)
           .eq('sender_number', senderNumber);
       } else {
         await supabase
           .from('Conversation')
-          .insert({ sender_number: senderNumber, last_interaction_timestamp: new Date().toISOString() });
+          .insert({ 
+            sender_number: senderNumber, 
+            last_interaction_timestamp: new Date().toISOString(),
+            ad_source: adSource
+          });
       }
 
       // Insert incoming message

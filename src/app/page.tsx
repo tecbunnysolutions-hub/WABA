@@ -21,6 +21,7 @@ type Conversation = {
   status: string;
   tags: string[];
   notes?: string;
+  ad_source?: string;
   messages?: Message[];
 };
 
@@ -318,6 +319,14 @@ export default function Dashboard() {
                     placeholder="Private notes about this lead..."
                   />
                 </div>
+                {activeConvObj?.ad_source && (
+                  <div className="crm-field" style={{ marginTop: '0.5rem' }}>
+                    <label>Advertisement Source</label>
+                    <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.75rem', borderRadius: '8px', color: '#60a5fa', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🎯</span> {activeConvObj.ad_source}
+                    </div>
+                  </div>
+                )}
                 <button 
                   className="save-btn" 
                   onClick={saveCrmData} 
