@@ -29,6 +29,23 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const handleQuickLogin = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'demo@business.com', name: 'Demo Agent' })
+      });
+      if (res.ok) {
+        window.location.href = "/";
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -82,6 +99,29 @@ export default function LoginPage() {
             {loading ? 'Authenticating...' : 'Sign In to Workspace'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>Just want to test the app?</p>
+          <button 
+            type="button"
+            onClick={handleQuickLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '1rem',
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '8px',
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '0.95rem',
+              transition: 'background 0.2s'
+            }}
+          >
+            ⚡ Quick Login as Demo Agent
+          </button>
+        </div>
       </div>
     </div>
   );
