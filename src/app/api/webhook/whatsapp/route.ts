@@ -62,9 +62,41 @@ export async function POST(req: Request) {
         if (content.type === 'TEXT') {
           textContent = content.text || '';
         } else if (content.type === 'IMAGE' || content.type === 'VIDEO' || content.type === 'DOCUMENT' || content.type === 'AUDIO') {
-          mediaUrl = content.url || content.mediaUrl || '';
+          const infobipUrl = content.url || content.mediaUrl || '';
           mediaType = content.type;
           textContent = content.caption || '';
+          
+          if (infobipUrl) {
+            try {
+              // Ensure the bucket exists
+              await supabase.storage.createBucket('whatsapp_media', { public: true });
+              
+              // Fetch the image from Infobip with auth
+              const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '5fc59d2ed3c46876ecd2914f4c4686af-b1ebcd6b-ce8e-47f5-b56f-340c9d041c4c';
+              const mediaRes = await fetch(infobipUrl, {
+                headers: { 'Authorization': `App ${INFOBIP_API_KEY}` }
+              });
+
+              if (mediaRes.ok) {
+                const arrayBuffer = await mediaRes.arrayBuffer();
+                const fileName = `${crypto.randomUUID()}`;
+                const contentType = mediaRes.headers.get('content-type') || 'application/octet-stream';
+                
+                // Upload to Supabase Storage
+                const { error: uploadError } = await supabase.storage
+                  .from('whatsapp_media')
+                  .upload(fileName, arrayBuffer, { contentType, upsert: true });
+
+                if (!uploadError) {
+                  // Get public URL
+                  const { data } = supabase.storage.from('whatsapp_media').getPublicUrl(fileName);
+                  mediaUrl = data.publicUrl;
+                }
+              }
+            } catch (err) {
+              console.error('Failed to proxy media to Supabase:', err);
+            }
+          }
         }
       } else if (msg.content?.text) {
         textContent = msg.content.text;
