@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     }
 
     // Check if user exists in DB
-    let { data: user } = await supabase.from('User').select('*').eq('email', email).single();
+    let { data: user } = await supabase.from('User').select('*').eq('email', email).maybeSingle();
 
     if (!user) {
       // Create new user
