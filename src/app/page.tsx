@@ -143,7 +143,7 @@ export default function Dashboard() {
                 <div key={msg.id} className={`message-wrapper ${msg.direction.toLowerCase()}`}>
                   <div className="message-bubble">
                     <p>{msg.message_content}</p>
-                    <span className="time">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
               ))}
