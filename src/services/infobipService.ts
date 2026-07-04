@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase';
 
 const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL || '';
 const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '';
@@ -60,11 +58,10 @@ async function sendInfobipRequest(endpoint: string, payload: any) {
 
 async function logFailedCall(payload: any, errorMsg: string) {
   try {
-    await prisma.failedApiCall.create({
-      data: {
-        payload: JSON.stringify(payload),
-        error: errorMsg
-      }
+    await supabase.from('FailedApiCall').insert({
+      payload: JSON.stringify(payload),
+      error: errorMsg,
+      timestamp: new Date().toISOString()
     });
   } catch (err) {
     console.error('Failed to log API call', err);
@@ -73,9 +70,11 @@ async function logFailedCall(payload: any, errorMsg: string) {
 
 export async function sendWhatsAppMessage(to: string, text: string) {
   // Check the conversation for 24-hour rule
-  const conversation = await prisma.conversation.findUnique({
-    where: { sender_number: to }
-  });
+  const { data: conversation } = await supabase
+    .from('Conversation')
+    .select('last_interaction_timestamp')
+    .eq('sender_number', to)
+    .single();
 
   const now = new Date();
   const isOutside24h = !conversation || (now.getTime() - new Date(conversation.last_interaction_timestamp).getTime()) > 24 * 60 * 60 * 1000;
@@ -101,13 +100,12 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   if (response?.success) {
     // Optionally insert outbound message to database here or let webhook handle it
     const msgId = response.data?.messages?.[0]?.messageId;
-    await prisma.message.create({
-      data: {
-        message_id: msgId,
-        sender_number: to,
-        direction: 'OUTBOUND',
-        message_content: text
-      }
+    await supabase.from('Message').insert({
+      message_id: msgId,
+      sender_number: to,
+      direction: 'OUTBOUND',
+      message_content: text,
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -136,13 +134,12 @@ export async function sendTemplateMessage(to: string, templateName: string) {
   const response = await sendInfobipRequest('/whatsapp/1/message/template', payload);
   if (response?.success) {
     const msgId = response.data?.messages?.[0]?.messageId;
-    await prisma.message.create({
-      data: {
-        message_id: msgId,
-        sender_number: to,
-        direction: 'OUTBOUND',
-        message_content: `[Template: ${templateName}]`
-      }
+    await supabase.from('Message').insert({
+      message_id: msgId,
+      sender_number: to,
+      direction: 'OUTBOUND',
+      message_content: `[Template: ${templateName}]`,
+      timestamp: new Date().toISOString()
     });
   }
 

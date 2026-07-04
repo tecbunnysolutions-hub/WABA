@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/services/infobipService';
 
 export const dynamic = 'force-dynamic';
-
-const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
@@ -12,24 +10,42 @@ export async function GET(req: Request) {
     const conversationId = searchParams.get('conversation');
 
     if (conversationId) {
-      const messages = await prisma.message.findMany({
-        where: { sender_number: conversationId },
-        orderBy: { timestamp: 'asc' }
-      });
-      return NextResponse.json({ messages });
+      const { data: messages, error } = await supabase
+        .from('Message')
+        .select('*')
+        .eq('sender_number', conversationId)
+        .order('timestamp', { ascending: true });
+
+      if (error) throw error;
+      return NextResponse.json({ messages: messages || [] });
     }
 
-    const conversations = await prisma.conversation.findMany({
-      orderBy: { last_interaction_timestamp: 'desc' },
-      include: {
-        messages: {
-          orderBy: { timestamp: 'desc' },
-          take: 1
-        }
-      }
-    });
+    // Note: Since Prisma's relation 'messages' was used, we fetch conversations, then fetch latest message for each.
+    const { data: conversations, error: convError } = await supabase
+      .from('Conversation')
+      .select('*')
+      .order('last_interaction_timestamp', { ascending: false });
 
-    return NextResponse.json({ conversations });
+    if (convError) throw convError;
+
+    // Fetch the latest message for each conversation
+    const conversationsWithMessages = await Promise.all(
+      (conversations || []).map(async (conv) => {
+        const { data: latestMessages } = await supabase
+          .from('Message')
+          .select('*')
+          .eq('sender_number', conv.sender_number)
+          .order('timestamp', { ascending: false })
+          .limit(1);
+
+        return {
+          ...conv,
+          messages: latestMessages || []
+        };
+      })
+    );
+
+    return NextResponse.json({ conversations: conversationsWithMessages });
 
   } catch (error) {
     console.error('Failed to fetch messages', error);

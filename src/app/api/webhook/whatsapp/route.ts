@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 import { getAutomatedResponse } from '@/services/chatbotService';
 import { sendWhatsAppMessage } from '@/services/infobipService';
 
-const prisma = new PrismaClient();
 const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || '';
 
 function verifySignature(payload: string, signature: string | null): boolean {
@@ -56,21 +55,33 @@ export async function POST(req: Request) {
       if (!senderNumber || !messageId) continue;
 
       // Upsert conversation to update last_interaction_timestamp
-      await prisma.conversation.upsert({
-        where: { sender_number: senderNumber },
-        update: { last_interaction_timestamp: new Date() },
-        create: { sender_number: senderNumber }
-      });
+      const { data: existingConv } = await supabase
+        .from('Conversation')
+        .select('id')
+        .eq('sender_number', senderNumber)
+        .single();
+
+      if (existingConv) {
+        await supabase
+          .from('Conversation')
+          .update({ last_interaction_timestamp: new Date().toISOString() })
+          .eq('sender_number', senderNumber);
+      } else {
+        await supabase
+          .from('Conversation')
+          .insert({ sender_number: senderNumber, last_interaction_timestamp: new Date().toISOString() });
+      }
 
       // Insert incoming message
-      await prisma.message.create({
-        data: {
+      await supabase
+        .from('Message')
+        .insert({
           message_id: messageId,
           sender_number: senderNumber,
           direction: 'INBOUND',
-          message_content: textContent
-        }
-      });
+          message_content: textContent,
+          timestamp: new Date().toISOString()
+        });
 
       // --- AUTOMATED CHATBOT LOGIC ---
       if (textContent) {
