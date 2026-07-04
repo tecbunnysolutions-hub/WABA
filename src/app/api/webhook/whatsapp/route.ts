@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getAutomatedResponse } from '@/services/chatbotService';
 import { sendWhatsAppMessage } from '@/services/infobipService';
 
-const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || '';
+const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || 'bunny@6010';
 
 function verifySignature(payload: string, signature: string | null): boolean {
   if (!signature || !INFOBIP_HMAC_SECRET) return false;
