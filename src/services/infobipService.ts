@@ -72,7 +72,7 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   // Check the conversation for 24-hour rule
   const { data: conversation } = await supabase
     .from('Conversation')
-    .select('id, last_interaction_timestamp')
+    .select('last_interaction_timestamp')
     .eq('sender_number', to)
     .single();
 
@@ -97,12 +97,13 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   };
 
   const response = await sendInfobipRequest('/whatsapp/1/message/text', payload);
-  if (response?.success && conversation?.id) {
+  if (response?.success) {
     // Optionally insert outbound message to database here or let webhook handle it
     const msgId = response.data?.messages?.[0]?.messageId;
+    const crypto = require('crypto');
     await supabase.from('Message').insert({
+      id: crypto.randomUUID(),
       message_id: msgId,
-      conversation_id: conversation.id,
       sender_number: to,
       direction: 'OUTBOUND',
       message_content: text,
@@ -134,23 +135,16 @@ export async function sendTemplateMessage(to: string, templateName: string) {
 
   const response = await sendInfobipRequest('/whatsapp/1/message/template', payload);
   if (response?.success) {
-    const { data: conversation } = await supabase
-      .from('Conversation')
-      .select('id')
-      .eq('sender_number', to)
-      .single();
-
-    if (conversation?.id) {
-      const msgId = response.data?.messages?.[0]?.messageId;
-      await supabase.from('Message').insert({
-        message_id: msgId,
-        conversation_id: conversation.id,
-        sender_number: to,
-        direction: 'OUTBOUND',
-        message_content: `[Template: ${templateName}]`,
-        timestamp: new Date().toISOString()
-      });
-    }
+    const crypto = require('crypto');
+    const msgId = response.data?.messages?.[0]?.messageId;
+    await supabase.from('Message').insert({
+      id: crypto.randomUUID(),
+      message_id: msgId,
+      sender_number: to,
+      direction: 'OUTBOUND',
+      message_content: `[Template: ${templateName}]`,
+      timestamp: new Date().toISOString()
+    });
   }
 
   return response;
