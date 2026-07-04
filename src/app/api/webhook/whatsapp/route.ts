@@ -43,6 +43,13 @@ export async function POST(req: Request) {
 
     const body = JSON.parse(rawBody);
     
+    // DEBUG: Log the raw payload to database to see EXACTLY what Infobip is sending
+    await supabase.from('FailedApiCall').insert({
+      payload: rawBody,
+      error: 'WEBHOOK_DEBUG_LOG',
+      created_at: new Date().toISOString()
+    });
+
     // Infobip payload structure for incoming messages:
     // { results: [ { messageId, from, to, message: { text } } ] }
     const results = body.results || [];
