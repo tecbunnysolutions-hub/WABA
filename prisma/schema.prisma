@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Conversation {
+  id                         Int       @id @default(autoincrement())
+  sender_number              String    @unique
+  last_interaction_timestamp DateTime  @default(now())
+  messages                   Message[]
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  message_id      String?      @unique
+  sender_number   String
+  direction       Direction
+  message_content String
+  timestamp       DateTime     @default(now())
+  status          String       @default("DELIVERED")
+
+  conversation    Conversation @relation(fields: [sender_number], references: [sender_number])
+}
+
+model FailedApiCall {
+  id          Int      @id @default(autoincrement())
+  payload     String
+  error       String
+  created_at  DateTime @default(now())
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+

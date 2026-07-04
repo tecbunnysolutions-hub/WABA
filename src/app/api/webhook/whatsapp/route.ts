@@ -1,0 +1,67 @@
+import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || '';
+
+function verifySignature(payload: string, signature: string | null): boolean {
+  if (!signature || !INFOBIP_HMAC_SECRET) return false;
+  
+  const hash = crypto
+    .createHmac('sha256', INFOBIP_HMAC_SECRET)
+    .update(payload)
+    .digest('base64');
+    
+  return hash === signature;
+}
+
+export async function POST(req: Request) {
+  try {
+    const rawBody = await req.text();
+    // Assuming Infobip sends the signature in x-hub-signature-256 or x-hub-signature header. 
+    // This may need adjustment based on Infobip's exact webhook signature header name.
+    const signature = req.headers.get('x-hub-signature-256') || req.headers.get('x-hub-signature');
+
+    if (!verifySignature(rawBody, signature)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody);
+    
+    // Infobip payload structure for incoming messages:
+    // { results: [ { messageId, from, to, message: { text } } ] }
+    const results = body.results || [];
+
+    for (const msg of results) {
+      const senderNumber = msg.from;
+      const messageId = msg.messageId;
+      const textContent = msg.message?.text || '';
+
+      if (!senderNumber || !messageId) continue;
+
+      // Upsert conversation to update last_interaction_timestamp
+      await prisma.conversation.upsert({
+        where: { sender_number: senderNumber },
+        update: { last_interaction_timestamp: new Date() },
+        create: { sender_number: senderNumber }
+      });
+
+      // Insert message
+      await prisma.message.create({
+        data: {
+          message_id: messageId,
+          sender_number: senderNumber,
+          direction: 'INBOUND',
+          message_content: textContent
+        }
+      });
+    }
+
+    return NextResponse.json({ status: 'success' }, { status: 200 });
+
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
