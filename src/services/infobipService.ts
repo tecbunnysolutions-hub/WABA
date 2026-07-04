@@ -85,15 +85,11 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   }
 
   const payload = {
-    messages: [
-      {
-        from: SYSTEM_NUMBER,
-        to: to,
-        content: {
-          text: text
-        }
-      }
-    ]
+    from: SYSTEM_NUMBER,
+    to: to,
+    content: {
+      text: text
+    }
   };
 
   const response = await sendInfobipRequest('/whatsapp/1/message/text', payload);
