@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getAutomatedResponse } from '@/services/chatbotService';
 import { sendWhatsAppMessage } from '@/services/infobipService';
 
-const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || '';
+const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || 'bunny@6010';
 
 function verifySignature(payload: string, signature: string | null): boolean {
   if (!signature || !INFOBIP_HMAC_SECRET) return false;
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
               await supabase.storage.createBucket('whatsapp_media', { public: true });
               
               // Fetch the image from Infobip with auth
-              const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '';
+              const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '5fc59d2ed3c46876ecd2914f4c4686af-b1ebcd6b-ce8e-47f5-b56f-340c9d041c4c';
               const mediaRes = await fetch(infobipUrl, {
                 headers: { 'Authorization': `App ${INFOBIP_API_KEY}` }
               });
