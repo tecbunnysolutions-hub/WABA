@@ -79,8 +79,15 @@ export async function POST(req: Request) {
 
               if (mediaRes.ok) {
                 const arrayBuffer = await mediaRes.arrayBuffer();
-                const fileName = `${crypto.randomUUID()}`;
                 const contentType = mediaRes.headers.get('content-type') || 'application/octet-stream';
+                
+                const extensionMap: Record<string, string> = {
+                  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+                  'video/mp4': '.mp4', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a', 'audio/mpeg': '.mp3',
+                  'application/pdf': '.pdf', 'application/msword': '.doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx'
+                };
+                const ext = extensionMap[contentType] || '';
+                const fileName = `${crypto.randomUUID()}${ext}`;
                 
                 // Upload to Supabase Storage
                 const { error: uploadError } = await supabase.storage
@@ -99,10 +106,13 @@ export async function POST(req: Request) {
           }
         } else if (content.type === 'LOCATION') {
           textContent = `📍 Location: https://maps.google.com/?q=${content.latitude},${content.longitude} ${content.address ? `(${content.address})` : ''}`;
-        } else if (content.type === 'CONTACT') {
-          const contactName = content.contacts?.[0]?.name?.formattedName || 'Contact';
+        } else if (content.type === 'CONTACT' || content.type === 'CONTACTS') {
+          const contactName = content.contacts?.[0]?.name?.formattedName || content.contacts?.[0]?.name?.firstName || 'Contact';
           const contactPhone = content.contacts?.[0]?.phones?.[0]?.phone || 'Unknown number';
           textContent = `👤 Contact: ${contactName} (${contactPhone})`;
+        } else {
+          // Fallback for unknown types (so it doesn't result in an empty bubble)
+          textContent = `[${content.type || 'Unknown'}]: ${JSON.stringify(content)}`;
         }
       } else if (msg.content?.text) {
         textContent = msg.content.text;
