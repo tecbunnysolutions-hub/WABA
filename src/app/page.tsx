@@ -141,7 +141,23 @@ export default function Dashboard() {
               <h3>{activeConversation}</h3>
             </div>
             <div className="messages-container">
-              {messages.map(msg => (
+              {messages.map(msg => {
+                const isLocation = msg.message_content && msg.message_content.startsWith('📍 Location: https://maps.google.com/?q=');
+                let locationCoords = '';
+                let locationAddress = '';
+                let locationUrl = '';
+                
+                if (isLocation) {
+                  const parts = msg.message_content.split('?q=');
+                  if (parts.length > 1) {
+                    const coordsAndAddress = parts[1].split(' ');
+                    locationCoords = coordsAndAddress[0];
+                    locationAddress = coordsAndAddress.slice(1).join(' ');
+                    locationUrl = msg.message_content.replace('📍 Location: ', '').split(' ')[0];
+                  }
+                }
+
+                return (
                 <div key={msg.id} className={`message-wrapper ${msg.direction.toLowerCase()}`}>
                   <div className="message-bubble">
                     {msg.media_url && msg.media_type === 'IMAGE' && (
@@ -158,11 +174,31 @@ export default function Dashboard() {
                         <span>📄</span> View Document
                       </a>
                     )}
-                    {msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>}
+                    
+                    {isLocation ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px' }}>
+                        <iframe 
+                          width="100%" 
+                          height="150" 
+                          style={{ borderRadius: '8px', border: 0, backgroundColor: '#f0f0f0' }}
+                          src={`https://maps.google.com/maps?q=${locationCoords}&z=15&output=embed`} 
+                          allowFullScreen 
+                          loading="lazy" 
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                        <a href={locationUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#007AFF', textDecoration: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>📍</span> Open in Maps {locationAddress}
+                        </a>
+                      </div>
+                    ) : (
+                      msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>
+                    )}
+                    
                     <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
             <form className="message-input-area" onSubmit={handleSendMessage}>
