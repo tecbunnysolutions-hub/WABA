@@ -70,8 +70,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result?.error || 'Failed to send' }, { status: 500 });
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to send message', error);
-    return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to send message', stack: error.stack }, { status: 500 });
   }
 }
