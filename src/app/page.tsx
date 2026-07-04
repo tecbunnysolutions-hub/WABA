@@ -156,8 +156,11 @@ export default function Dashboard() {
     <div className="dashboard-container">
       {/* PANE 1: Sidebar / Conversation List */}
       <div className="glass-panel sidebar">
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>CRM Inbox</h2>
+          <a href="/campaigns" style={{ fontSize: '0.85rem', color: '#60a5fa', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>
+            🚀 Campaigns
+          </a>
         </div>
         <div className="conversation-list">
           {loading ? (

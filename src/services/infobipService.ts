@@ -110,7 +110,7 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   return response;
 }
 
-export async function sendTemplateMessage(to: string, templateName: string) {
+export async function sendTemplateMessage(to: string, templateName: string, placeholders: string[] = []) {
   const payload = {
     messages: [
       {
@@ -120,7 +120,7 @@ export async function sendTemplateMessage(to: string, templateName: string) {
           templateName: templateName,
           templateData: {
             body: {
-              placeholders: []
+              placeholders: placeholders
             }
           },
           language: TEMPLATE_LANGUAGE
