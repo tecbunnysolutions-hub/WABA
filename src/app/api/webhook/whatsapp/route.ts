@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { getAutomatedResponse } from '@/services/chatbotService';
+import { sendWhatsAppMessage } from '@/services/infobipService';
 
 const prisma = new PrismaClient();
 const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || '';
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
         create: { sender_number: senderNumber }
       });
 
-      // Insert message
+      // Insert incoming message
       await prisma.message.create({
         data: {
           message_id: messageId,
@@ -56,6 +58,16 @@ export async function POST(req: Request) {
           message_content: textContent
         }
       });
+
+      // --- AUTOMATED CHATBOT LOGIC ---
+      if (textContent) {
+        const autoReply = getAutomatedResponse(textContent);
+        if (autoReply) {
+          // Send the response immediately back to the user
+          // Note: sendWhatsAppMessage already handles creating the 'OUTBOUND' DB record internally
+          await sendWhatsAppMessage(senderNumber, autoReply);
+        }
+      }
     }
 
     return NextResponse.json({ status: 'success' }, { status: 200 });
