@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { sender_number, contact_name, status, tags, notes } = body;
+    const { sender_number, contact_name, status, tags, notes, assigned_to, department } = body;
 
     if (!sender_number) {
       return NextResponse.json({ error: 'Missing sender_number' }, { status: 400 });
@@ -18,6 +18,8 @@ export async function PATCH(req: Request) {
     if (status !== undefined) updateData.status = status;
     if (tags !== undefined) updateData.tags = tags;
     if (notes !== undefined) updateData.notes = notes;
+    if (assigned_to !== undefined) updateData.assigned_to = assigned_to;
+    if (department !== undefined) updateData.department = department;
 
     const { data, error } = await supabase
       .from('Conversation')

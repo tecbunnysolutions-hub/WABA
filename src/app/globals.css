@@ -389,3 +389,132 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 0;
+    gap: 0;
+  }
+  
+  .sidebar {
+    width: 100%;
+    position: absolute;
+    height: 100vh;
+    z-index: 10;
+    border-radius: 0;
+    transition: transform 0.3s ease;
+  }
+  
+  .sidebar.hidden {
+    transform: translateX(-100%);
+  }
+
+  .crm-panel {
+    width: 100%;
+    position: absolute;
+    height: 100vh;
+    right: 0;
+    z-index: 10;
+    border-radius: 0;
+    background: var(--background);
+    transition: transform 0.3s ease;
+  }
+
+  .crm-panel.hidden {
+    transform: translateX(100%);
+  }
+  
+  .chat-area {
+    width: 100%;
+    border-radius: 0;
+  }
+  
+  .chat-main {
+    border-right: none;
+  }
+
+  .glass-panel {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .mobile-toggle {
+    display: block !important;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+
+  .message-wrapper {
+    max-width: 90%;
+  }
+
+  .message-input-area {
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+
+  .attachment-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .attachment-toolbar button {
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .message-input-area input {
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+  }
+  
+  .message-input-area button[type="submit"] {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.mobile-toggle {
+  display: none;
+}
+
+/* Attachment Toolbar Desktop */
+.attachment-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.attachment-toolbar button {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attachment-toolbar button:hover {
+  background: rgba(255,255,255,0.2);
+}
+

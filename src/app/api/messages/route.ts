@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sendWhatsAppMessage } from '@/services/infobipService';
+import { sendWhatsAppMessage, sendWhatsAppLocation } from '@/services/infobipService';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,13 +56,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { to, text } = body;
+    const { to, text, location } = body;
 
-    if (!to || !text) {
-      return NextResponse.json({ error: 'Missing "to" or "text"' }, { status: 400 });
+    if (!to) {
+      return NextResponse.json({ error: 'Missing "to"' }, { status: 400 });
     }
 
-    const result = await sendWhatsAppMessage(to, text);
+    let result;
+    if (location) {
+      result = await sendWhatsAppLocation(to, location.latitude, location.longitude, location.name, location.address);
+    } else if (text) {
+      result = await sendWhatsAppMessage(to, text);
+    } else {
+      return NextResponse.json({ error: 'Missing "text" or "location"' }, { status: 400 });
+    }
     
     if (result?.success) {
       return NextResponse.json({ success: true });

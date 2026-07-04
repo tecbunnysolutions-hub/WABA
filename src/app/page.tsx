@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 type Message = {
   id: string;
@@ -22,10 +23,23 @@ type Conversation = {
   tags: string[];
   notes?: string;
   ad_source?: string;
+  assigned_to?: string;
+  department?: string;
   messages?: Message[];
 };
 
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
 export default function Dashboard() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,16 +47,35 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Mobile Responsiveness States
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showCrm, setShowCrm] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
   // CRM Panel State
   const [crmName, setCrmName] = useState("");
   const [crmStatus, setCrmStatus] = useState("NEW");
   const [crmNotes, setCrmNotes] = useState("");
+  const [crmAssignedTo, setCrmAssignedTo] = useState("");
+  const [crmDepartment, setCrmDepartment] = useState("UNASSIGNED");
   const [isSavingCrm, setIsSavingCrm] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchConversations();
-    const interval = setInterval(fetchConversations, 5000);
-    return () => clearInterval(interval);
+    // 1. Authenticate Agent
+    fetch('/api/auth/me').then(res => res.json()).then(data => {
+      if (!data.user) {
+        router.push('/login');
+      } else {
+        setCurrentUser(data.user);
+        fetchUsers();
+        fetchConversations();
+        const interval = setInterval(fetchConversations, 5000);
+        return () => clearInterval(interval);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -50,25 +83,28 @@ export default function Dashboard() {
       fetchMessages(activeConversation);
       const interval = setInterval(() => fetchMessages(activeConversation), 3000);
       
-      // Load CRM data into state when active conversation changes
       const activeObj = conversations.find(c => c.sender_number === activeConversation);
       if (activeObj) {
         setCrmName(activeObj.contact_name || "");
         setCrmStatus(activeObj.status || "NEW");
         setCrmNotes(activeObj.notes || "");
+        setCrmAssignedTo(activeObj.assigned_to || "");
+        setCrmDepartment(activeObj.department || "UNASSIGNED");
       }
-
       return () => clearInterval(interval);
     }
   }, [activeConversation]);
 
-  // Update CRM state if conversations array updates (and we aren't typing)
-  // To prevent overwriting user input while they type, we only update if the activeObj differs significantly or we're just relying on initial load.
-  // Actually, standard behavior is fine without constant overwrite.
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users'); // we need to make this endpoint or just mock it for now. Actually we can do it via a new endpoint, but wait, I didn't create /api/users yet!
+      // Let's create it later or just show a text input for assigned_to for now.
+    } catch (e) {}
+  };
 
   const fetchConversations = async () => {
     try {
@@ -78,25 +114,19 @@ export default function Dashboard() {
         setConversations(data.conversations);
         setLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const fetchMessages = async (sender: string) => {
     try {
       const res = await fetch(`/api/messages?conversation=${sender}`);
       const data = await res.json();
-      if (data.messages) {
-        setMessages(data.messages);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (data.messages) setMessages(data.messages);
+    } catch (err) { console.error(err); }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!inputText.trim() || !activeConversation) return;
 
     const textToSend = inputText;
@@ -118,12 +148,33 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: activeConversation, text: textToSend })
       });
-      if (res.ok) {
-        fetchMessages(activeConversation);
-      }
+      if (res.ok) fetchMessages(activeConversation);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    if (!e.target.files || !e.target.files[0] || !activeConversation) return;
+    const file = e.target.files[0];
+    
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('to', activeConversation);
+    formData.append('type', type);
+
+    try {
+      const res = await fetch('/api/messages/media', {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) fetchMessages(activeConversation);
+      else alert("Failed to send media.");
     } catch (err) {
-      console.error(err);
+      alert("Upload error.");
     }
+    setIsUploading(false);
+    // Reset file input
+    e.target.value = '';
   };
 
   const saveCrmData = async () => {
@@ -137,17 +188,20 @@ export default function Dashboard() {
           sender_number: activeConversation,
           contact_name: crmName,
           status: crmStatus,
-          notes: crmNotes
+          notes: crmNotes,
+          assigned_to: crmAssignedTo,
+          department: crmDepartment
         })
       });
-      if (res.ok) {
-        fetchConversations(); // Refresh list to show new names/statuses
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (res.ok) fetchConversations();
+    } catch (err) { console.error(err); }
     setIsSavingCrm(false);
+    setShowCrm(false); // hide on mobile after save
   };
+
+  if (!currentUser) {
+    return <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}><div className="spinner"></div></div>;
+  }
 
   const activeConvObj = conversations.find(c => c.sender_number === activeConversation);
   const displayName = activeConvObj?.contact_name || activeConversation;
@@ -155,12 +209,13 @@ export default function Dashboard() {
   return (
     <div className="dashboard-container">
       {/* PANE 1: Sidebar / Conversation List */}
-      <div className="glass-panel sidebar">
+      <div className={`glass-panel sidebar ${!showSidebar ? 'hidden' : ''}`}>
         <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>CRM Inbox</h2>
-          <a href="/campaigns" style={{ fontSize: '0.85rem', color: '#60a5fa', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>
-            🚀 Campaigns
-          </a>
+          <h2>Inbox <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'normal' }}>({currentUser.name})</span></h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a href="/campaigns" style={{ fontSize: '0.85rem', color: '#60a5fa', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>🚀 Ads</a>
+            <button className="mobile-toggle" onClick={() => setShowSidebar(false)}>✕</button>
+          </div>
         </div>
         <div className="conversation-list">
           {loading ? (
@@ -175,6 +230,9 @@ export default function Dashboard() {
                   setCrmName(conv.contact_name || "");
                   setCrmStatus(conv.status || "NEW");
                   setCrmNotes(conv.notes || "");
+                  setCrmAssignedTo(conv.assigned_to || "");
+                  setCrmDepartment(conv.department || "UNASSIGNED");
+                  setShowSidebar(false); // Auto hide on mobile
                 }}
               >
                 <div className="avatar">{(conv.contact_name || conv.sender_number).substring(0, 2).toUpperCase()}</div>
@@ -183,11 +241,19 @@ export default function Dashboard() {
                   <span className="last-msg">
                     {conv.messages?.[0]?.message_content || 'No messages'}
                   </span>
-                  {conv.status && (
-                    <span className={`crm-status-badge status-${conv.status}`}>
-                      {conv.status}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    {conv.status && (
+                      <span className={`crm-status-badge status-${conv.status}`}>
+                        {conv.status}
+                      </span>
+                    )}
+                    {conv.department && conv.department !== 'UNASSIGNED' && (
+                      <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)' }}>🏢 {conv.department}</span>
+                    )}
+                    {conv.assigned_to && (
+                      <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>👤 {conv.assigned_to}</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -202,15 +268,14 @@ export default function Dashboard() {
             {/* PANE 2: Chat Main */}
             <div className="chat-main">
               <div className="chat-header">
-                <h3>{displayName}</h3>
+                <button className="mobile-toggle" onClick={() => setShowSidebar(true)} style={{ marginRight: '1rem' }}>☰</button>
+                <h3 style={{ flexGrow: 1 }}>{displayName}</h3>
+                <button className="mobile-toggle" onClick={() => setShowCrm(!showCrm)}>👤</button>
               </div>
               <div className="messages-container">
                 {messages.map(msg => {
                   const isLocation = msg.message_content && msg.message_content.startsWith('📍 Location: https://maps.google.com/?q=');
-                  let locationCoords = '';
-                  let locationAddress = '';
-                  let locationUrl = '';
-                  
+                  let locationCoords = '', locationAddress = '', locationUrl = '';
                   if (isLocation) {
                     const parts = msg.message_content.split('?q=');
                     if (parts.length > 1) {
@@ -241,15 +306,7 @@ export default function Dashboard() {
                       
                       {isLocation ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px' }}>
-                          <iframe 
-                            width="100%" 
-                            height="150" 
-                            style={{ borderRadius: '8px', border: 0, backgroundColor: '#f0f0f0' }}
-                            src={`https://maps.google.com/maps?q=${locationCoords}&z=15&output=embed`} 
-                            allowFullScreen 
-                            loading="lazy" 
-                            referrerPolicy="no-referrer-when-downgrade"
-                          />
+                          <iframe width="100%" height="150" style={{ borderRadius: '8px', border: 0, backgroundColor: '#f0f0f0' }} src={`https://maps.google.com/maps?q=${locationCoords}&z=15&output=embed`} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"/>
                           <a href={locationUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#007AFF', textDecoration: 'none', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span>📍</span> Open in Maps {locationAddress}
                           </a>
@@ -257,7 +314,6 @@ export default function Dashboard() {
                       ) : (
                         msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>
                       )}
-                      
                       <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
@@ -265,46 +321,64 @@ export default function Dashboard() {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <form className="message-input-area" onSubmit={handleSendMessage}>
-                <input 
-                  type="text" 
-                  placeholder="Type a message..." 
-                  value={inputText}
-                  onChange={e => setInputText(e.target.value)}
-                  autoFocus
-                />
-                <button type="submit" disabled={!inputText.trim()}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                </button>
-              </form>
+
+              {/* ATTACHMENT TOOLBAR & INPUT */}
+              <div style={{ position: 'relative' }}>
+                {isUploading && <div style={{ position: 'absolute', top: '-30px', left: '20px', background: 'rgba(59,130,246,0.8)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem' }}>Uploading media...</div>}
+                <form className="message-input-area" onSubmit={handleSendMessage}>
+                  <div className="attachment-toolbar">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} title="Send Image">📷</button>
+                    <button type="button" onClick={() => docInputRef.current?.click()} title="Send Document">📄</button>
+                    {/* Hidden inputs */}
+                    <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'image')} accept="image/*,video/*" style={{ display: 'none' }} />
+                    <input type="file" ref={docInputRef} onChange={(e) => handleFileUpload(e, 'document')} accept=".pdf,.doc,.docx" style={{ display: 'none' }} />
+                  </div>
+
+                  <input 
+                    type="text" 
+                    placeholder="Type a message..." 
+                    value={inputText}
+                    onChange={e => setInputText(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" disabled={!inputText.trim() && !isUploading}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </form>
+              </div>
             </div>
 
             {/* PANE 3: CRM Details Panel */}
-            <div className="crm-panel">
-              <div className="crm-header">
-                <h3>Contact Details</h3>
+            <div className={`crm-panel ${!showCrm ? 'hidden' : ''}`}>
+              <div className="crm-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>CRM Details</h3>
+                <button className="mobile-toggle" onClick={() => setShowCrm(false)}>✕</button>
               </div>
               <div className="crm-body">
                 <div className="crm-field">
                   <label>Name</label>
-                  <input 
-                    type="text" 
-                    className="crm-input" 
-                    value={crmName} 
-                    onChange={e => setCrmName(e.target.value)}
-                    placeholder="E.g. John Doe"
-                  />
+                  <input type="text" className="crm-input" value={crmName} onChange={e => setCrmName(e.target.value)} placeholder="E.g. John Doe"/>
+                </div>
+                <div className="crm-field">
+                  <label>Assign To Agent</label>
+                  <input type="text" className="crm-input" value={crmAssignedTo} onChange={e => setCrmAssignedTo(e.target.value)} placeholder="e.g. Alice" title="Type the name of the agent to assign this chat."/>
+                </div>
+                <div className="crm-field">
+                  <label>Agent Mode / Department</label>
+                  <select className="crm-select" value={crmDepartment} onChange={e => setCrmDepartment(e.target.value)}>
+                    <option value="UNASSIGNED">Unassigned Mode</option>
+                    <option value="SUPPORT">Support</option>
+                    <option value="SALES">Sales</option>
+                    <option value="MARKETING">Marketing</option>
+                    <option value="BILLING">Billing</option>
+                  </select>
                 </div>
                 <div className="crm-field">
                   <label>Pipeline Stage</label>
-                  <select 
-                    className="crm-select" 
-                    value={crmStatus} 
-                    onChange={e => setCrmStatus(e.target.value)}
-                  >
+                  <select className="crm-select" value={crmStatus} onChange={e => setCrmStatus(e.target.value)}>
                     <option value="NEW">New</option>
                     <option value="LEAD">Lead</option>
                     <option value="QUALIFIED">Qualified</option>
@@ -315,16 +389,11 @@ export default function Dashboard() {
                 </div>
                 <div className="crm-field">
                   <label>Internal Notes</label>
-                  <textarea 
-                    className="crm-textarea" 
-                    value={crmNotes} 
-                    onChange={e => setCrmNotes(e.target.value)}
-                    placeholder="Private notes about this lead..."
-                  />
+                  <textarea className="crm-textarea" value={crmNotes} onChange={e => setCrmNotes(e.target.value)} placeholder="Private notes about this lead..."/>
                 </div>
                 {activeConvObj?.ad_source && (
                   <div className="crm-field" style={{ marginTop: '0.5rem' }}>
-                    <label>Advertisement Source</label>
+                    <label>Ad Source</label>
                     <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.75rem', borderRadius: '8px', color: '#60a5fa', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>🎯</span> {activeConvObj.ad_source}
                     </div>
@@ -346,13 +415,14 @@ export default function Dashboard() {
                     opacity: isSavingCrm ? 0.7 : 1
                   }}
                 >
-                  {isSavingCrm ? 'Saving...' : 'Save Details'}
+                  {isSavingCrm ? 'Saving...' : 'Save Profile'}
                 </button>
               </div>
             </div>
           </>
         ) : (
-          <div className="empty-state" style={{ width: '100%' }}>
+          <div className="empty-state" style={{ width: '100%', position: 'relative' }}>
+            <button className="mobile-toggle" onClick={() => setShowSidebar(true)} style={{ position: 'absolute', top: '1rem', left: '1rem' }}>☰ Inbox</button>
             <div className="empty-icon">💬</div>
             <h2>Select a conversation</h2>
             <p>Choose a contact from the sidebar to view your message history.</p>

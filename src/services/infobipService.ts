@@ -145,3 +145,60 @@ export async function sendTemplateMessage(to: string, templateName: string, plac
 
   return response;
 }
+
+export async function sendWhatsAppMedia(to: string, type: 'image' | 'video' | 'audio' | 'document', mediaUrl: string, caption?: string) {
+  const payload: any = {
+    from: SYSTEM_NUMBER,
+    to: to,
+    content: { mediaUrl: mediaUrl }
+  };
+  
+  if (caption) {
+    payload.content.caption = caption;
+  }
+
+  const response = await sendInfobipRequest(`/whatsapp/1/message/${type}`, payload);
+  
+  if (response?.success) {
+    const msgId = response.data?.messages?.[0]?.messageId;
+    const crypto = require('crypto');
+    await supabase.from('Message').insert({
+      id: crypto.randomUUID(),
+      message_id: msgId,
+      sender_number: to,
+      direction: 'OUTBOUND',
+      message_content: caption || '[Media]',
+      media_url: mediaUrl,
+      media_type: type.toUpperCase(),
+      timestamp: new Date().toISOString()
+    });
+  }
+  return response;
+}
+
+export async function sendWhatsAppLocation(to: string, latitude: number, longitude: number, name?: string, address?: string) {
+  const payload: any = {
+    from: SYSTEM_NUMBER,
+    to: to,
+    content: { latitude, longitude }
+  };
+  
+  if (name) payload.content.name = name;
+  if (address) payload.content.address = address;
+
+  const response = await sendInfobipRequest(`/whatsapp/1/message/location`, payload);
+  
+  if (response?.success) {
+    const msgId = response.data?.messages?.[0]?.messageId;
+    const crypto = require('crypto');
+    await supabase.from('Message').insert({
+      id: crypto.randomUUID(),
+      message_id: msgId,
+      sender_number: to,
+      direction: 'OUTBOUND',
+      message_content: `📍 Location: https://maps.google.com/?q=${latitude},${longitude} ${address ? `(${address})` : ''}`,
+      timestamp: new Date().toISOString()
+    });
+  }
+  return response;
+}

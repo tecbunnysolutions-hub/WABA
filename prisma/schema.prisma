@@ -17,7 +17,17 @@ model Conversation {
   tags                       String[]  @default([])
   notes                      String?
   ad_source                  String?
+  assigned_to                String?
+  department                 String    @default("UNASSIGNED")
   messages                   Message[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      String   @default("AGENT")
+  createdAt DateTime @default(now())
 }
 
 model Message {
