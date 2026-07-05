@@ -56,3 +56,12 @@ enum Direction {
   OUTBOUND
 }
 
+model Template {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  language     String   @default("en")
+  content      String
+  status       String   @default("APPROVED")
+  created_at   DateTime @default(now())
+}
+

@@ -28,6 +28,12 @@ type Conversation = {
   messages?: Message[];
 };
 
+type Template = {
+  id: string;
+  name: string;
+  content: string;
+};
+
 type User = {
   id: string;
   name: string;
@@ -43,6 +49,8 @@ export default function Dashboard() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -72,6 +80,7 @@ export default function Dashboard() {
         setCurrentUser(data.user);
         fetchUsers();
         fetchConversations();
+        fetchTemplates();
         const interval = setInterval(fetchConversations, 5000);
         return () => clearInterval(interval);
       }
@@ -122,6 +131,14 @@ export default function Dashboard() {
       const res = await fetch(`/api/messages?conversation=${sender}`);
       const data = await res.json();
       if (data.messages) setMessages(data.messages);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch('/api/templates');
+      const data = await res.json();
+      if (data.templates) setTemplates(data.templates);
     } catch (err) { console.error(err); }
   };
 
@@ -206,6 +223,11 @@ export default function Dashboard() {
   const activeConvObj = conversations.find(c => c.sender_number === activeConversation);
   const displayName = activeConvObj?.contact_name || activeConversation;
 
+  // 24-Hour Guardrail Logic
+  const lastInteraction = activeConvObj?.last_interaction_timestamp ? new Date(activeConvObj.last_interaction_timestamp) : new Date(0);
+  const hoursSinceLastInteraction = (new Date().getTime() - lastInteraction.getTime()) / (1000 * 60 * 60);
+  const isOutsideWindow = hoursSinceLastInteraction > 24;
+
   return (
     <div className="dashboard-container">
       {/* PANE 1: Sidebar / Conversation List */}
@@ -213,6 +235,7 @@ export default function Dashboard() {
         <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Inbox <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'normal' }}>({currentUser.name})</span></h2>
           <div style={{ display: 'flex', gap: '8px' }}>
+            <a href="/templates" style={{ fontSize: '0.85rem', color: '#10b981', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>📑 Templates</a>
             <a href="/campaigns" style={{ fontSize: '0.85rem', color: '#60a5fa', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>🚀 Ads</a>
             <button className="mobile-toggle" onClick={() => setShowSidebar(false)}>✕</button>
           </div>
@@ -314,7 +337,15 @@ export default function Dashboard() {
                       ) : (
                         msg.message_content && msg.message_content !== '[Media]' && <p>{msg.message_content}</p>
                       )}
-                      <span className="time">{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                        <span className="time" style={{ margin: 0 }}>{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {msg.direction === 'OUTBOUND' && (
+                          <span style={{ fontSize: '0.8rem', color: msg.status === 'READ' ? '#3b82f6' : '#94a3b8' }}>
+                            {msg.status === 'READ' ? '✓✓' : msg.status === 'DELIVERED' ? '✓✓' : msg.status === 'FAILED' ? '❌' : '✓'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   );
@@ -325,23 +356,47 @@ export default function Dashboard() {
               {/* ATTACHMENT TOOLBAR & INPUT */}
               <div style={{ position: 'relative' }}>
                 {isUploading && <div style={{ position: 'absolute', top: '-30px', left: '20px', background: 'rgba(59,130,246,0.8)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem' }}>Uploading media...</div>}
-                <form className="message-input-area" onSubmit={handleSendMessage}>
-                  <div className="attachment-toolbar">
-                    <button type="button" onClick={() => fileInputRef.current?.click()} title="Send Image">📷</button>
-                    <button type="button" onClick={() => docInputRef.current?.click()} title="Send Document">📄</button>
-                    {/* Hidden inputs */}
-                    <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'image')} accept="image/*,video/*" style={{ display: 'none' }} />
-                    <input type="file" ref={docInputRef} onChange={(e) => handleFileUpload(e, 'document')} accept=".pdf,.doc,.docx" style={{ display: 'none' }} />
-                  </div>
+                <form className="message-input-area" onSubmit={handleSendMessage} style={{ background: isOutsideWindow ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.1)' }}>
+                  
+                  {isOutsideWindow ? (
+                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: 600 }}>⚠️ Outside 24-Hour Window (Template Required)</span>
+                      <select 
+                        className="crm-select" 
+                        style={{ border: '1px solid #ef4444', background: 'rgba(255,255,255,0.05)' }}
+                        value={selectedTemplate}
+                        onChange={(e) => {
+                          setSelectedTemplate(e.target.value);
+                          const t = templates.find(t => t.id === e.target.value);
+                          if (t) setInputText(t.content);
+                        }}
+                      >
+                        <option value="">-- Select an Approved Template --</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="attachment-toolbar">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} title="Send Image">📷</button>
+                        <button type="button" onClick={() => docInputRef.current?.click()} title="Send Document">📄</button>
+                        <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'image')} accept="image/*,video/*" style={{ display: 'none' }} />
+                        <input type="file" ref={docInputRef} onChange={(e) => handleFileUpload(e, 'document')} accept=".pdf,.doc,.docx" style={{ display: 'none' }} />
+                      </div>
 
-                  <input 
-                    type="text" 
-                    placeholder="Type a message..." 
-                    value={inputText}
-                    onChange={e => setInputText(e.target.value)}
-                    autoFocus
-                  />
-                  <button type="submit" disabled={!inputText.trim() && !isUploading}>
+                      <input 
+                        type="text" 
+                        placeholder="Type a message..." 
+                        value={inputText}
+                        onChange={e => setInputText(e.target.value)}
+                        autoFocus
+                      />
+                    </>
+                  )}
+
+                  <button type="submit" disabled={(!inputText.trim() && !isUploading) || (isOutsideWindow && !selectedTemplate)}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13"></line>
                       <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
