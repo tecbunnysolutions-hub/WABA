@@ -133,9 +133,12 @@ export async function POST(req: Request) {
       // Upsert conversation to update last_interaction_timestamp and optionally ad_source
       const { data: existingConv } = await supabase
         .from('Conversation')
-        .select('id, ad_source')
+        .select('id, ad_source, last_interaction_timestamp, ai_active, contact_name, deal_value, active_flow')
         .eq('sender_number', senderNumber)
         .single();
+        
+      const oldLastInteraction = existingConv?.last_interaction_timestamp ? new Date(existingConv.last_interaction_timestamp) : new Date(0);
+      const hoursSinceLastMessage = (new Date().getTime() - oldLastInteraction.getTime()) / (1000 * 60 * 60);
 
       if (existingConv) {
         const updatePayload: any = { last_interaction_timestamp: new Date().toISOString() };
@@ -173,11 +176,63 @@ export async function POST(req: Request) {
 
       // --- AUTOMATED CHATBOT LOGIC ---
       if (textContent) {
-        const autoReply = getAutomatedResponse(textContent);
-        if (autoReply) {
-          // Send the response immediately back to the user
-          // Note: sendWhatsAppMessage already handles creating the 'OUTBOUND' DB record internally
-          await sendWhatsAppMessage(senderNumber, autoReply);
+        // Check if AI is active for this contact
+        const aiActive = existingConv ? existingConv.ai_active !== false : true; // Default true
+        
+        if (aiActive) {
+          // Check 24-hour window
+          if (hoursSinceLastMessage > 24) {
+            // Firing Meta-approved template because window was closed
+            const templateMsg = `Hello ${existingConv?.contact_name || ''}, we saw you're back. Would you like to continue where we left off? Reply YES to resume.`;
+            await sendWhatsAppMessage(senderNumber, templateMsg);
+            
+            // Mark as sent by Admin/System
+            await supabase.from('Message').insert({
+              id: crypto.randomUUID(),
+              sender_number: senderNumber,
+              direction: 'OUTBOUND',
+              message_content: templateMsg,
+              timestamp: new Date().toISOString(),
+              status: 'SENT',
+              sent_by: 'ADMIN' // Treat system template as ADMIN or SYSTEM
+            });
+          } else {
+            // Window is open. Fetch last 5 messages for context
+            const { data: historyData } = await supabase
+              .from('Message')
+              .select('direction, message_content')
+              .eq('sender_number', senderNumber)
+              .order('timestamp', { ascending: false })
+              .limit(5);
+              
+            // Reverse so they are chronological
+            const history = (historyData || []).reverse();
+            
+            const autoReply = await getAutomatedResponse(
+              textContent,
+              history,
+              {
+                name: existingConv?.contact_name,
+                dealValue: existingConv?.deal_value,
+                activeFlow: existingConv?.active_flow
+              }
+            );
+            
+            if (autoReply) {
+              await sendWhatsAppMessage(senderNumber, autoReply);
+              
+              // Ensure we log the AI's response in the DB
+              await supabase.from('Message').insert({
+                id: crypto.randomUUID(),
+                sender_number: senderNumber,
+                direction: 'OUTBOUND',
+                message_content: autoReply,
+                timestamp: new Date().toISOString(),
+                status: 'SENT',
+                sent_by: 'AI'
+              });
+            }
+          }
         }
       }
     }

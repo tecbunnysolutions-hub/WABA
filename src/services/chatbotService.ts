@@ -1,35 +1,38 @@
-export function getAutomatedResponse(incomingMessage: string): string | null {
-  const normalizedMessage = incomingMessage.trim().toLowerCase();
-
-  // Define simple keyword matching rules
-  const rules = [
-    {
-      keywords: ['hi', 'hello', 'hey', 'start'],
-      response: 'Hello! Welcome to our WhatsApp service. How can we help you today? Type "menu" for options.'
-    },
-    {
-      keywords: ['menu', 'options', 'help'],
-      response: 'Here are our options:\n1. Type "hours" for our business hours.\n2. Type "support" to speak with an agent.'
-    },
-    {
-      keywords: ['hours', 'time', 'open'],
-      response: 'Our business hours are Monday to Friday, 9:00 AM to 5:00 PM EST.'
-    },
-    {
-      keywords: ['support', 'agent', 'human'],
-      response: 'Connecting you to our support team. An agent will be with you shortly!'
-    }
-  ];
-
-  for (const rule of rules) {
-    // Check if any keyword exactly matches or is contained in the incoming message
-    if (rule.keywords.some(kw => normalizedMessage.includes(kw))) {
-      return rule.response;
-    }
+export async function getAutomatedResponse(
+  incomingMessage: string,
+  history: { direction: string; message_content: string }[],
+  contactInfo: { name?: string; dealValue?: string; activeFlow?: string }
+): Promise<string | null> {
+  // Construct the prompt with history
+  let prompt = "System Prompt: You are an expert real estate and technical solutions assistant.\n";
+  prompt += "Context:\n";
+  if (contactInfo.name) prompt += `- Lead Name: ${contactInfo.name}\n`;
+  if (contactInfo.dealValue) prompt += `- Deal Value: ${contactInfo.dealValue}\n`;
+  if (contactInfo.activeFlow) prompt += `- Active Flow: ${contactInfo.activeFlow}\n`;
+  prompt += "\nChat History (last 5 messages):\n";
+  
+  for (const msg of history) {
+    const sender = msg.direction === 'INBOUND' ? 'Client' : 'Assistant';
+    prompt += `${sender}: ${msg.message_content}\n`;
   }
+  
+  prompt += `Client: ${incomingMessage}\nAssistant:`;
 
-  // Fallback response if no keywords match (optional). 
-  // Returning null means the bot ignores unrecognized messages and leaves it for a human.
-  // return "I'm sorry, I didn't understand that. Type 'help' for options.";
-  return null;
+  // Simulate LLM API Call
+  // Note: Replace this block with your actual LLM (e.g., OpenAI or Gemini) SDK call
+  console.log("--- CALLING LLM API ---");
+  console.log(prompt);
+  console.log("-----------------------");
+
+  // Basic mocked response for now
+  const normalizedMessage = incomingMessage.trim().toLowerCase();
+  
+  if (normalizedMessage.includes('hello') || normalizedMessage.includes('hi') || normalizedMessage.includes('hey')) {
+    return `Hello ${contactInfo.name || 'there'}! I'm your AI assistant. How can I help you today with your real estate needs?`;
+  }
+  if (normalizedMessage.includes('price') || normalizedMessage.includes('cost')) {
+    return "Our property prices vary depending on the location and amenities. Would you like me to send you our current listings brochure?";
+  }
+  
+  return "I understand you're asking about that. As an AI assistant, I've noted your request in the CRM. Is there anything else you need?";
 }

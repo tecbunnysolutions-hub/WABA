@@ -12,6 +12,7 @@ type Message = {
   status: string;
   media_url?: string;
   media_type?: string;
+  sent_by?: 'AI' | 'ADMIN';
 };
 
 type Conversation = {
@@ -25,6 +26,9 @@ type Conversation = {
   ad_source?: string;
   assigned_to?: string;
   department?: string;
+  ai_active?: boolean;
+  active_flow?: string;
+  deal_value?: string;
   messages?: Message[];
 };
 
@@ -66,7 +70,11 @@ export default function Dashboard() {
   const [crmNotes, setCrmNotes] = useState("");
   const [crmAssignedTo, setCrmAssignedTo] = useState("");
   const [crmDepartment, setCrmDepartment] = useState("UNASSIGNED");
+  const [crmAiActive, setCrmAiActive] = useState(true);
+  const [crmDealValue, setCrmDealValue] = useState("");
+  const [crmActiveFlow, setCrmActiveFlow] = useState("");
   const [isSavingCrm, setIsSavingCrm] = useState(false);
+  const [globalAiOverride, setGlobalAiOverride] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +107,9 @@ export default function Dashboard() {
         setCrmNotes(activeObj.notes || "");
         setCrmAssignedTo(activeObj.assigned_to || "");
         setCrmDepartment(activeObj.department || "UNASSIGNED");
+        setCrmAiActive(activeObj.ai_active !== false); // default true
+        setCrmDealValue(activeObj.deal_value || "");
+        setCrmActiveFlow(activeObj.active_flow || "");
       }
       return () => clearInterval(interval);
     }
@@ -155,7 +166,8 @@ export default function Dashboard() {
       direction: 'OUTBOUND',
       message_content: textToSend,
       timestamp: new Date().toISOString(),
-      status: 'SENDING'
+      status: 'SENDING',
+      sent_by: 'ADMIN'
     };
     setMessages(prev => [...prev, tempMsg]);
 
@@ -207,7 +219,10 @@ export default function Dashboard() {
           status: crmStatus,
           notes: crmNotes,
           assigned_to: crmAssignedTo,
-          department: crmDepartment
+          department: crmDepartment,
+          ai_active: crmAiActive,
+          deal_value: crmDealValue,
+          active_flow: crmActiveFlow
         })
       });
       if (res.ok) fetchConversations();
@@ -234,9 +249,16 @@ export default function Dashboard() {
       <div className={`glass-panel sidebar ${!showSidebar ? 'hidden' : ''}`}>
         <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Inbox <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'normal' }}>({currentUser.name})</span></h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <a href="/templates" style={{ fontSize: '0.85rem', color: '#10b981', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>📑 Templates</a>
-            <a href="/campaigns" style={{ fontSize: '0.85rem', color: '#60a5fa', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>🚀 Ads</a>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => setGlobalAiOverride(!globalAiOverride)}
+              style={{ fontSize: '0.85rem', color: globalAiOverride ? '#ef4444' : '#10b981', textDecoration: 'none', background: globalAiOverride ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', padding: '6px 10px', borderRadius: '6px', border: `1px solid ${globalAiOverride ? '#ef4444' : '#10b981'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              title="Global AI Override (shuts down AI for all)"
+            >
+              {globalAiOverride ? '🛑 AI Overridden' : '🤖 AI Active'}
+            </button>
+            <a href="/templates" style={{ fontSize: '0.85rem', color: 'var(--template-color)', textDecoration: 'none', background: 'rgba(99, 102, 241, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>📑 Templates</a>
+            <a href="/campaigns" style={{ fontSize: '0.85rem', color: 'var(--accent)', textDecoration: 'none', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>🚀 Ads</a>
             <button className="mobile-toggle" onClick={() => setShowSidebar(false)}>✕</button>
           </div>
         </div>
@@ -255,6 +277,9 @@ export default function Dashboard() {
                   setCrmNotes(conv.notes || "");
                   setCrmAssignedTo(conv.assigned_to || "");
                   setCrmDepartment(conv.department || "UNASSIGNED");
+                  setCrmAiActive(conv.ai_active !== false);
+                  setCrmDealValue(conv.deal_value || "");
+                  setCrmActiveFlow(conv.active_flow || "");
                   setShowSidebar(false); // Auto hide on mobile
                 }}
               >
@@ -264,6 +289,13 @@ export default function Dashboard() {
                   <span className="last-msg">
                     {conv.messages?.[0]?.message_content || 'No messages'}
                   </span>
+                  <div style={{ marginTop: '4px', display: 'flex', gap: '4px' }}>
+                    {conv.ai_active !== false && !globalAiOverride ? (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--ai-accent)', border: '1px solid var(--ai-accent)', padding: '2px 4px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)' }}>AI Active</span>
+                    ) : (
+                      <span style={{ fontSize: '0.7rem', color: '#ef4444', border: '1px solid #ef4444', padding: '2px 4px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.1)' }}>{globalAiOverride ? 'AI Overridden' : 'Paused (Human)'}</span>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     {conv.status && (
                       <span className={`crm-status-badge status-${conv.status}`}>
@@ -339,6 +371,11 @@ export default function Dashboard() {
                       )}
                       
                       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                        {msg.direction === 'OUTBOUND' && msg.sent_by && (
+                          <span style={{ fontSize: '0.7rem', color: msg.sent_by === 'AI' ? '#9ca3af' : '#60a5fa', marginRight: '4px' }}>
+                            Sent by {msg.sent_by === 'AI' ? 'AI Agent' : 'Admin'}
+                          </span>
+                        )}
                         <span className="time" style={{ margin: 0 }}>{new Date(msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         {msg.direction === 'OUTBOUND' && (
                           <span style={{ fontSize: '0.8rem', color: msg.status === 'READ' ? '#3b82f6' : '#94a3b8' }}>
@@ -413,6 +450,25 @@ export default function Dashboard() {
                 <button className="mobile-toggle" onClick={() => setShowCrm(false)}>✕</button>
               </div>
               <div className="crm-body">
+                <div className="crm-field">
+                  <label>AI Autopilot</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={crmAiActive} onChange={e => setCrmAiActive(e.target.checked)} style={{ width: '18px', height: '18px' }}/>
+                    <span style={{ color: crmAiActive ? '#10b981' : '#ef4444', fontWeight: 600 }}>{crmAiActive ? 'Active' : 'Paused'}</span>
+                  </label>
+                </div>
+                <div className="crm-field">
+                  <label>Deal Value</label>
+                  <input type="text" className="crm-input" value={crmDealValue} onChange={e => setCrmDealValue(e.target.value)} placeholder="$0.00"/>
+                </div>
+                <div className="crm-field">
+                  <label>Active Flow</label>
+                  <select className="crm-select" value={crmActiveFlow} onChange={e => setCrmActiveFlow(e.target.value)}>
+                    <option value="">-- No Flow --</option>
+                    <option value="Property Inquiry Flow">Property Inquiry Flow</option>
+                    <option value="Support Intake Flow">Support Intake Flow</option>
+                  </select>
+                </div>
                 <div className="crm-field">
                   <label>Name</label>
                   <input type="text" className="crm-input" value={crmName} onChange={e => setCrmName(e.target.value)} placeholder="E.g. John Doe"/>
