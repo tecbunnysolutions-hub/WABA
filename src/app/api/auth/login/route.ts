@@ -14,7 +14,8 @@ export async function POST(req: Request) {
 
     if (!user) {
       // Create new user
-      const { data: newUser, error } = await supabase.from('User').insert({ email, name }).select().single();
+      const newId = crypto.randomUUID();
+      const { data: newUser, error } = await supabase.from('User').insert({ id: newId, email, name }).select().single();
       if (error) throw error;
       user = newUser;
     }
