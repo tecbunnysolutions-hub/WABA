@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
-import { getAutomatedResponse } from '@/services/chatbotService';
+import { getAutomatedResponse, analyzeIntent } from '@/services/chatbotService';
 import { sendWhatsAppMessage } from '@/services/infobipService';
 
 const INFOBIP_HMAC_SECRET = process.env.INFOBIP_HMAC_SECRET || 'bunny@6010';
@@ -205,16 +205,43 @@ export async function POST(req: Request) {
               .order('timestamp', { ascending: false })
               .limit(5);
               
+            // Get bot's last message for context
+            const lastBotMsg = historyData?.find(m => m.direction === 'OUTBOUND')?.message_content || null;
+            
             // Reverse so they are chronological
             const history = (historyData || []).reverse();
             
+            // 1. Analyze Intent
+            const intent = await analyzeIntent(textContent, lastBotMsg);
+            
+            let currentFlow = existingConv?.active_flow;
+            
+            if (intent === 'OPT_OUT') {
+              // Pause AI and acknowledge
+              await supabase.from('Conversation').update({ ai_active: false }).eq('sender_number', senderNumber);
+              const optOutMsg = "Understood. I will pause automated messages. Let me know if you need anything else.";
+              await sendWhatsAppMessage(senderNumber, optOutMsg);
+              await supabase.from('Message').insert({
+                id: crypto.randomUUID(), sender_number: senderNumber, direction: 'OUTBOUND',
+                message_content: optOutMsg, timestamp: new Date().toISOString(), status: 'SENT', sent_by: 'ADMIN'
+              });
+              continue; // Move to next message
+            } else if (intent === 'PROPERTY_INQUIRY') {
+              currentFlow = 'Property Inquiry Flow';
+              await supabase.from('Conversation').update({ active_flow: currentFlow }).eq('sender_number', senderNumber);
+            } else if (intent === 'TECH_SERVICES') {
+              currentFlow = 'Tech Services Flow';
+              await supabase.from('Conversation').update({ active_flow: currentFlow }).eq('sender_number', senderNumber);
+            }
+            
+            // 2. Generate Contextual Response
             const autoReply = await getAutomatedResponse(
               textContent,
               history,
               {
                 name: existingConv?.contact_name,
                 dealValue: existingConv?.deal_value,
-                activeFlow: existingConv?.active_flow
+                activeFlow: currentFlow
               }
             );
             
